@@ -6,6 +6,18 @@ using UnityEditor.Formats.Fbx.Exporter;
 using Autodesk.Fbx;
 using UnityEngine.UIElements;
 
+public class CurveList
+{
+    public List<Keyframe> posx = new List<Keyframe>();
+    public List<Keyframe> posy = new List<Keyframe>();
+    public List<Keyframe> posz = new List<Keyframe>();
+
+    public List<Keyframe> rotx = new List<Keyframe>();
+    public List<Keyframe> roty = new List<Keyframe>();
+    public List<Keyframe> rotz = new List<Keyframe>();
+    public List<Keyframe> rotw = new List<Keyframe>();    
+}
+
 public struct Frame
 {
     public float timestamp;
@@ -147,6 +159,7 @@ public class MotionCapture : MonoBehaviour
     {
         AnimationClip clip = new AnimationClip();
         clip.name = "CurrentRecording";
+        clip.legacy = true;
         ModelImporterClipAnimation clipSettings = new ModelImporterClipAnimation
         {
             name = clip.name,
@@ -154,32 +167,63 @@ public class MotionCapture : MonoBehaviour
 
         };
 
+        Dictionary<string, CurveList> curveDict = new Dictionary<string, CurveList>();
         foreach (var frame in animationFrames)
         {
             foreach (var boneTransform in frame.boneTransforms)
             {
-                AddKeyframe(clip, boneTransform.Key, frame.timestamp - startTime, boneTransform.Value.position, boneTransform.Value.rotation);
+                AddKeyframe(curveDict, boneTransform.Key, frame.timestamp-startTime, boneTransform.Value.position, boneTransform.Value.rotation);
             }     
         }
-        Debug.Log("Animation created");
+
+        foreach (var entry in curveDict)
+        {
+            
+            clip.SetCurve(entry.Key, typeof(Transform), "localPosition.x", keysToCurve(entry.Value.posx));
+            clip.SetCurve(entry.Key, typeof(Transform), "localPosition.y", keysToCurve(entry.Value.posy));
+            clip.SetCurve(entry.Key, typeof(Transform), "localPosition.z", keysToCurve(entry.Value.posz));
+            
+            clip.SetCurve(entry.Key, typeof(Transform), "localRotation.x", keysToCurve(entry.Value.rotx));
+            clip.SetCurve(entry.Key, typeof(Transform), "localRotation.y", keysToCurve(entry.Value.roty));
+            clip.SetCurve(entry.Key, typeof(Transform), "localRotation.z", keysToCurve(entry.Value.rotz));
+            clip.SetCurve(entry.Key, typeof(Transform), "localRotation.w", keysToCurve(entry.Value.rotw));
+        }
+
         return clip;
     }
+
+    AnimationCurve keysToCurve(List<Keyframe> list)
+    {
+        AnimationCurve curve = new AnimationCurve();
+        foreach (var keyframe in list)
+        {
+            curve.AddKey(keyframe);
+        }
+        return curve;
+    }
+
     void SaveAnimation(AnimationClip clip, string path)
     {
         UnityEditor.AssetDatabase.CreateAsset(clip, path);
         UnityEditor.AssetDatabase.SaveAssets();
         Debug.Log("Animation Saved!");
     }
-    void AddKeyframe(AnimationClip clip, string boneName, float time, Vector3 pos, Quaternion rot)
-    {
-        clip.SetCurve(boneName, typeof(Transform), "localPosition.x", CreateCurve(time, pos.x));
-        clip.SetCurve(boneName, typeof(Transform), "localPosition.y", CreateCurve(time, pos.y));
-        clip.SetCurve(boneName, typeof(Transform), "localPosition.z", CreateCurve(time, pos.z));
 
-        clip.SetCurve(boneName, typeof(Transform), "localRotation.x", CreateCurve(time, rot.x));
-        clip.SetCurve(boneName, typeof(Transform), "localRotation.y", CreateCurve(time, rot.y));
-        clip.SetCurve(boneName, typeof(Transform), "localRotation.z", CreateCurve(time, rot.z));
-        clip.SetCurve(boneName, typeof(Transform), "localRotation.w", CreateCurve(time, rot.w));
+    void AddKeyframe(Dictionary<string, CurveList> curveDict, string boneName, float time, Vector3 pos, Quaternion rot)
+    {
+        if (!curveDict.ContainsKey(boneName))
+        {
+            curveDict[boneName] = new CurveList();
+        }
+
+        curveDict[boneName].posx.Add(new Keyframe(time, pos.x));
+        curveDict[boneName].posy.Add(new Keyframe(time, pos.y));
+        curveDict[boneName].posz.Add(new Keyframe(time, pos.z));
+        
+        curveDict[boneName].rotx.Add(new Keyframe(time, rot.x));
+        curveDict[boneName].roty.Add(new Keyframe(time, rot.y));
+        curveDict[boneName].rotz.Add(new Keyframe(time, rot.z));
+        curveDict[boneName].rotw.Add(new Keyframe(time, rot.w));
     }
 
     AnimationCurve CreateCurve(float time, float value)
