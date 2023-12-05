@@ -6,6 +6,7 @@ using UnityEditor.Formats.Fbx.Exporter;
 using Autodesk.Fbx;
 using UnityEngine.UIElements;
 
+
 public class CurveList
 {
     public List<Keyframe> posx = new List<Keyframe>();
@@ -31,26 +32,44 @@ public struct TransformData
 }
 public class MotionCapture : MonoBehaviour
 {
+    
+    public GameObject mirrorModel;
+
     private List<Frame> animationFrames = new List<Frame>();
     private bool isRecording = false;
+    private bool isPlaying = false;
     private float startTime = 0f;
+    private AnimationClip lastClip;
 
     // Start is called before the first frame update
     void Start()
     {
-
+        mirrorModel.SetActive(false); // hide mirrored model to start
     }
 
     // Update is called once per frame
     void Update()
     {
+        bool busy = isPlaying || isRecording;
         if (Input.GetKeyDown(KeyCode.B))
-        {
-            StartRecording();
+        {   
+            if (!busy)
+                StartRecording();
         }
         if (Input.GetKeyDown(KeyCode.N))
         {
-            StopRecording();
+            if (isRecording)
+            {
+                StopRecording();
+                lastClip = CreateAnimation();
+                ExportAnimation(lastClip);
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.P))
+        {
+            // Need to record once before playing
+            if (lastClip != null && !busy)
+                PlayRecording(lastClip);
         }
 
         // StartRecording
@@ -116,11 +135,9 @@ public class MotionCapture : MonoBehaviour
     public void StopRecording()
     {
         isRecording = false;
-
-        ExportAnimation();
     }
 
-    public void ExportAnimation()
+    public void ExportAnimation(AnimationClip clip)
     {
         /*foreach (var frame in animationFrames)
             {
@@ -134,7 +151,6 @@ public class MotionCapture : MonoBehaviour
 
         // Convert our animated frames to a suitable format
         // Use AnimationClip
-        AnimationClip clip = CreateAnimation();
         SaveAnimation(clip, "Assets/TestingAnim.anim");
 
         GameObject duplicateUser = Instantiate(gameObject);
@@ -145,14 +161,6 @@ public class MotionCapture : MonoBehaviour
         ExportFBXWithRecording(duplicateUser, "Assets/TestingFBX.fbx");
         
         Destroy(duplicateUser);
-         
-
-
-        // For Testing
-        /*ApplyAnimation(gameObject, clip);
-
-        ExportFBXWithRecording(gameObject, "Assets/TestingFBX.fbx");*/
-
     }
 
     AnimationClip CreateAnimation()
@@ -167,6 +175,7 @@ public class MotionCapture : MonoBehaviour
 
         };
 
+        // Put bone transforms into curve list. This helps reorganize the loop structure from for-frame to for-joint so it's easy to make curves
         Dictionary<string, CurveList> curveDict = new Dictionary<string, CurveList>();
         foreach (var frame in animationFrames)
         {
@@ -176,9 +185,9 @@ public class MotionCapture : MonoBehaviour
             }     
         }
 
+        // Loop over each joint, convert keyframes of transform values to curves, then attach to clip
         foreach (var entry in curveDict)
         {
-            
             clip.SetCurve(entry.Key, typeof(Transform), "localPosition.x", keysToCurve(entry.Value.posx));
             clip.SetCurve(entry.Key, typeof(Transform), "localPosition.y", keysToCurve(entry.Value.posy));
             clip.SetCurve(entry.Key, typeof(Transform), "localPosition.z", keysToCurve(entry.Value.posz));
@@ -192,6 +201,7 @@ public class MotionCapture : MonoBehaviour
         return clip;
     }
 
+    // Converts a list of key frames to an animation curve
     AnimationCurve keysToCurve(List<Keyframe> list)
     {
         AnimationCurve curve = new AnimationCurve();
@@ -211,15 +221,18 @@ public class MotionCapture : MonoBehaviour
 
     void AddKeyframe(Dictionary<string, CurveList> curveDict, string boneName, float time, Vector3 pos, Quaternion rot)
     {
+        // Initial entry in curve dictionary
         if (!curveDict.ContainsKey(boneName))
         {
             curveDict[boneName] = new CurveList();
         }
 
+        // Add position keyframe
         curveDict[boneName].posx.Add(new Keyframe(time, pos.x));
         curveDict[boneName].posy.Add(new Keyframe(time, pos.y));
         curveDict[boneName].posz.Add(new Keyframe(time, pos.z));
         
+        // Add rotation keyframe
         curveDict[boneName].rotx.Add(new Keyframe(time, rot.x));
         curveDict[boneName].roty.Add(new Keyframe(time, rot.y));
         curveDict[boneName].rotz.Add(new Keyframe(time, rot.z));
@@ -232,11 +245,11 @@ public class MotionCapture : MonoBehaviour
         return new AnimationCurve(keyframe);
     }
 
-    void ApplyAnimation(GameObject target, AnimationClip clip)
+    Animation ApplyAnimation(GameObject target, AnimationClip clip)
     {
         Animation anim = target.AddComponent<Animation>();
         anim.AddClip(clip, clip.name);
-        //anim.Play(clip.name);
+        return anim;
     }
 
     void ExportFBXWithRecording(GameObject duplicateUser, string path)
@@ -252,5 +265,24 @@ public class MotionCapture : MonoBehaviour
          * */
     }
 
+    // Play animation clip on mirrored model
+    void PlayRecording(AnimationClip clip)
+    {
+        mirrorModel.SetActive(true); // show model
+        Animation anim = ApplyAnimation(mirrorModel, clip);
+        isPlaying = true;
+        anim.Play(clip.name);
 
+        StartCoroutine(StopMirrorModel(clip.length, anim)); // hide model after clip finishes
+    }
+
+    // Helper function to clean up model after animation
+    IEnumerator StopMirrorModel (float time, Animation anim)
+    {
+        yield return new WaitForSeconds(time);
+
+        mirrorModel.SetActive(false); // hide model
+        Destroy(anim); // destroy animation
+        isPlaying = false;
+    }
 }
