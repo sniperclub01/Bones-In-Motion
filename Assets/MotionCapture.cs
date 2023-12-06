@@ -5,6 +5,8 @@ using UnityEditor;
 using UnityEditor.Formats.Fbx.Exporter;
 using Autodesk.Fbx;
 using UnityEngine.UIElements;
+using Valve.VR;
+using Valve.VR.InteractionSystem;
 
 
 public class CurveList
@@ -40,23 +42,29 @@ public class MotionCapture : MonoBehaviour
     private bool isPlaying = false;
     private float startTime = 0f;
     private AnimationClip lastClip;
+ 
+    private SteamVR_TrackedObject trackedObject;
+    private SteamVR_Input_Sources inputSource;
 
     // Start is called before the first frame update
     void Start()
     {
         mirrorModel.SetActive(false); // hide mirrored model to start
+
+        trackedObject = GetComponent<SteamVR_TrackedObject>();
+        inputSource = SteamVR_Input_Sources.Any;
     }
 
     // Update is called once per frame
     void Update()
     {
         bool busy = isPlaying || isRecording;
-        if (Input.GetKeyDown(KeyCode.B))
+        if (Input.GetKeyDown(KeyCode.B) || SteamVR_Actions.default_SnapTurnLeft.GetState(inputSource)) // B key or left d pad
         {   
             if (!busy)
                 StartRecording();
         }
-        if (Input.GetKeyDown(KeyCode.N))
+        if (Input.GetKeyDown(KeyCode.N) || SteamVR_Actions.default_SnapTurnRight.GetState(inputSource)) // N key or right d pad
         {
             if (isRecording)
             {
@@ -65,7 +73,7 @@ public class MotionCapture : MonoBehaviour
                 ExportAnimation(lastClip);
             }
         }
-        if (Input.GetKeyDown(KeyCode.P))
+        if (Input.GetKeyDown(KeyCode.P) || SteamVR_Actions.default_GrabPinch.GetState(inputSource)) // P key or trigger
         {
             // Need to record once before playing
             if (lastClip != null && !busy)
