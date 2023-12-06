@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class UpperIK : MonoBehaviour
+public class ArmUpperIK : MonoBehaviour
 {
     public GameObject end;
     public GameObject upper;
@@ -12,7 +12,7 @@ public class UpperIK : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+
     }
 
     // Update is called once per frame
@@ -31,7 +31,7 @@ public class UpperIK : MonoBehaviour
 
 
         //float constant = (float)1.0;
-        Vector3 newPos = new Vector3( (90-shoulderAngle), upper.transform.localEulerAngles.y, upper.transform.localEulerAngles.z);
+        Vector3 newPos = new Vector3(90 - shoulderAngle, upper.transform.localEulerAngles.y, upper.transform.localEulerAngles.z);
         this.transform.localEulerAngles = newPos;
         upperLimb.transform.eulerAngles = this.transform.eulerAngles;
 
