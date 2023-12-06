@@ -7,7 +7,7 @@ using Autodesk.Fbx;
 using UnityEngine.UIElements;
 using Valve.VR;
 using Valve.VR.InteractionSystem;
-
+using System;
 using UnityEngine.Animations.Rigging;
 
 public class CurveList
@@ -37,6 +37,9 @@ public class MotionCapture : MonoBehaviour
 {
     
     public GameObject mirrorModel;
+    public GameObject leftHand;
+    public GameObject rightHand;
+    public GameObject recordIndicator;
 
     private List<Frame> animationFrames = new List<Frame>();
     private bool isRecording = false;
@@ -59,26 +62,35 @@ public class MotionCapture : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        Debug.Log(SteamVR_Actions.default_GrabGrip.GetStateDown(inputSource));
         bool busy = isPlaying || isRecording;
-        if (Input.GetKeyDown(KeyCode.B) || SteamVR_Actions.default_SnapTurnLeft.GetState(inputSource)) // B key or left d pad
+        //if ((Input.GetKeyDown(KeyCode.B) || SteamVR_Actions.default_GrabGrip.GetStateDown(inputSource)) && !isRecording) // B key or grab grib
+        if ((Input.GetKeyDown(KeyCode.B) || SteamVR_Actions.default_record.GetStateDown(inputSource)) && !isRecording) // B key or grab grib
         {   
-            if (!busy)
-                StartRecording();
+            StartRecording();
+            recordIndicator.SetActive(true);
         }
-        if (Input.GetKeyDown(KeyCode.N) || SteamVR_Actions.default_SnapTurnRight.GetState(inputSource)) // N key or right d pad
+        else if ((Input.GetKeyDown(KeyCode.N) || SteamVR_Actions.default_record.GetStateDown(inputSource)) && isRecording) // N key or grab grib
         {
             if (isRecording)
             {
                 StopRecording();
+                recordIndicator.SetActive(false);
                 lastClip = CreateAnimation();
-                ExportAnimation(lastClip);
             }
         }
-        if (Input.GetKeyDown(KeyCode.P) || SteamVR_Actions.default_GrabPinch.GetState(inputSource)) // P key or trigger
+        if (Input.GetKeyDown(KeyCode.P) || SteamVR_Actions.default_play.GetStateDown(inputSource) 
+        || SteamVR_Actions.default_SnapTurnLeft.GetStateDown(inputSource)) // P key or dpad left/right
         {
             // Need to record once before playing
             if (lastClip != null && !busy)
                 PlayRecording(lastClip);
+        }
+        // Check if export button is clicked
+        if (!isRecording)
+        {
+            checkExportClick(leftHand, lastClip);
+            checkExportClick(rightHand, lastClip);
         }
 
         // StartRecording
@@ -86,7 +98,27 @@ public class MotionCapture : MonoBehaviour
         {
             RecordFrame();
         }
-        // Stop Recording
+    }
+
+    void checkExportClick(GameObject hand, AnimationClip clip)
+    {
+        RaycastHit[] hits;
+        hits = Physics.RaycastAll(hand.transform.position, hand.transform.forward, 1000.0f);
+
+        for (int i = 0; i < hits.Length; ++i)
+        {
+            //int id = hits[i].gameObject.GetInstanceID();
+            if (hits[i].collider.gameObject.tag == "UI")
+            {
+                if (hits[i].collider.gameObject.name == "ExportButton")
+                {
+                    if (SteamVR_Actions.default_GrabPinch.GetState(inputSource))
+                    {
+                        ExportAnimation(clip);
+                    }
+                }
+            }
+        }
     }
 
 
@@ -160,7 +192,9 @@ public class MotionCapture : MonoBehaviour
 
         // Convert our animated frames to a suitable format
         // Use AnimationClip
-        SaveAnimation(clip, "Assets/TestingAnim.anim");
+        DateTime time = DateTime.Now;
+        string timeStr = time.ToString("MM-dd-mm-ss");
+        SaveAnimation(clip, "Assets/"+timeStr+".anim");
 
         GameObject duplicateUser = Instantiate(gameObject);
         duplicateUser.GetComponent<BoneRenderer>().enabled = false;
@@ -169,7 +203,7 @@ public class MotionCapture : MonoBehaviour
         ApplyAnimation(duplicateUser, clip);
 
         // Export
-        ExportFBXWithRecording(duplicateUser, "Assets/TestingFBX.fbx");
+        ExportFBXWithRecording(duplicateUser, "Assets/"+timeStr+"_FBX.fbx");
         
         Destroy(duplicateUser);
     }
