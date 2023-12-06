@@ -8,6 +8,7 @@ using UnityEngine.UIElements;
 using Valve.VR;
 using Valve.VR.InteractionSystem;
 
+using UnityEngine.Animations.Rigging;
 
 public class CurveList
 {
@@ -162,6 +163,8 @@ public class MotionCapture : MonoBehaviour
         SaveAnimation(clip, "Assets/TestingAnim.anim");
 
         GameObject duplicateUser = Instantiate(gameObject);
+        duplicateUser.GetComponent<BoneRenderer>().enabled = false;
+        duplicateUser.GetComponent<MotionCapture>().enabled = false;
 
         ApplyAnimation(duplicateUser, clip);
 
